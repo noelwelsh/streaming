@@ -9,23 +9,24 @@ sealed trait Stream[A] {
   def zip[B](that: Stream[B]): Stream[(A,B)] =
     Zip(this, that)
 
+  def filter(predicate: A => Boolean): Stream[A] =
+    Filter(this, predicate)
+
   /** The interpreter, executes a stream. */
   def foldLeft[B](z: B)(combine: (B, A) => B): B = {
+    import target._
     import Result._
 
-    def next[C](stream: Stream[C]): Result[C] =
-      stream match {
-        case Map(s,f) => next(s).map(f)
-        case Zip(l,r) => (next(l) zip next(r))
-        case FromIterator(s) =>
-          if (s.hasNext) Result.emit(s.next()) else Result.completed
+    val t = Target.fromStream(this)
+
+    def loop(result: B): B =
+      t.next() match {
+        case Emit(v) => loop(combine(result, v))
+        case Await => loop(result)
+        case Completed => result
       }
 
-    next(this) match {
-      case Emit(v) => foldLeft(combine(z, v))(combine)
-      case Await => foldLeft(z)(combine)
-      case Completed => z
-    }
+    loop(z)
   }
 
   def toList: List[A] = {
@@ -35,6 +36,7 @@ sealed trait Stream[A] {
 object Stream {
   final case class Map[A,B](source: Stream[A], f: A => B) extends Stream[B]
   final case class Zip[A,B](left: Stream[A], right: Stream[B]) extends Stream[(A,B)]
+  final case class Filter[A](source: Stream[A], predicate: A => Boolean) extends Stream[A]
   final case class FromIterator[A](source: Iterator[A]) extends Stream[A]
 
   def fromIterator[A](source: Iterator[A]): Stream[A] =

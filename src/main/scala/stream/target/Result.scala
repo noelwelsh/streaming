@@ -1,4 +1,5 @@
 package stream
+package target
 
 sealed abstract class Result[+A] extends Product with Serializable {
   import Result._
@@ -14,23 +15,6 @@ sealed abstract class Result[+A] extends Product with Serializable {
     this match {
       case Emit(value) => f(value)
       case Await => Await
-      case Completed => Completed
-    }
-
-  def zip[B](that: Result[B]): Result[(A,B)] =
-    this match {
-      case Emit(v1) =>
-        that match {
-          case Emit(v2) => Emit((v1, v2))
-          case Await => Await
-          case Completed => Completed
-        }
-      case Await =>
-        that match {
-          case Emit(v2) => Await
-          case Await => Await
-          case Completed => Completed
-        }
       case Completed => Completed
     }
 }
