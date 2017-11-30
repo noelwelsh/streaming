@@ -30,7 +30,7 @@ sealed trait Stream[A] {
   }
 
   def toList: List[A] = {
-    this.foldLeft(List.empty[A])((list, elt) => elt +: list)
+    this.foldLeft(List.empty[A])((list, elt) => elt +: list).reverse
   }
 }
 object Stream {
@@ -38,7 +38,11 @@ object Stream {
   final case class Zip[A,B](left: Stream[A], right: Stream[B]) extends Stream[(A,B)]
   final case class Filter[A](source: Stream[A], predicate: A => Boolean) extends Stream[A]
   final case class FromIterator[A](source: Iterator[A]) extends Stream[A]
+  final case class FromSeq[A](source: Seq[A]) extends Stream[A]
 
   def fromIterator[A](source: Iterator[A]): Stream[A] =
     FromIterator(source)
+
+  def fromSeq[A](source: Seq[A]): Stream[A] =
+    FromSeq(source)
 }
