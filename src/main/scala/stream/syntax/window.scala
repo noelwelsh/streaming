@@ -12,21 +12,22 @@ import java.time.{Duration, Instant}
   * directly to Stream, and probably less confusing to the end user.
   */
 object window {
-  implicit class WindowOps[A](stream: Stream[A]){
-    val epochStart = Instant.ofEpochMilli(0L)
+  private val epochStart = Instant.ofEpochMilli(0L)
+  private def withinWindow(instant: Instant, windowEnd: Instant, width: Duration): Boolean = {
+    val duration = Duration.between(instant, windowEnd)
+    duration.compareTo(width) <= 0
+  }
 
-    def slidingWindow(timestamp: A => Instant)(
-      withinWindow: Duration => Boolean): Stream[Seq[A]] = {
+  implicit class WindowOps[A](stream: Stream[A]){
+
+    def slidingWindow(width: Duration)(timestamp: A => Instant): Stream[Seq[A]] = {
       stream.
         scanLeft((epochStart, Seq.empty[A])){ (acc, a) =>
           val (latest, window) = acc
           val ts = timestamp(a)
           val now = if(ts.isAfter(latest)) ts else latest
           val updatedWindow =
-            (a +: window).filter{ a =>
-              val duration = Duration.between(timestamp(a), now)
-              withinWindow(duration)
-            }
+            (a +: window).filter{ a => withinWindow(timestamp(a), now, width) }
 
           (now, updatedWindow)
         }.

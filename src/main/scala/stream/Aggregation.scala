@@ -36,13 +36,10 @@ object Aggregation {
   val source = Stream.fromSeq(events)
 
   val windowSize = Duration.ofMillis(50L)
-  def withinWindow(duration: Duration): Boolean =
-    duration.compareTo(windowSize) <= 0
-
-  val windowed = source.slidingWindow(_.instant)(withinWindow)
+  val windowed = source.slidingWindow(windowSize)(_.instant)
 
   // Count occurrences and order from lowest to highest
-  val occurences = windowed.map{ window =>
+  val occurrences = windowed.map{ window =>
     val keys = window.map(event => event.key).distinct
     val keysCount = keys.map(key => window.count(event => event.key == key))
 
