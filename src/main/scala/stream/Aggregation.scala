@@ -1,36 +1,51 @@
 package stream
-/*
-import scala.concurrent.duration._
+
+import java.time.{Duration, Instant}
 
 object Aggregation {
-  val input: Stream[Event] = ...
+  import stream.syntax.window._
 
-  val events: Stream[Event] = input.filter(_ == key)
-  val latest: Stream[Timestamp] =
-    input.scan(Time.zero)((latest, event) =>
-      latest.max(event.timestamp))
+  final case class Event(instant: Instant, key: String)
 
-  val window1: Stream[Seq[Event]] =
-    events.slidingWindow(latest)((latest, event) =>
-      (latest - event.timestamp) < 1.minutes)
+  // Events that occur slightly out of order. B is the most common event at the
+  // start of the stream, A at the end.
+  val events =
+    Seq(
+      Event(Instant.ofEpochMilli(100L), "A"),
+      Event(Instant.ofEpochMilli(120L), "B"),
+      Event(Instant.ofEpochMilli(130L), "A"),
+      Event(Instant.ofEpochMilli(140L), "B"),
+      Event(Instant.ofEpochMilli(120L), "B"),
+      Event(Instant.ofEpochMilli(150L), "B"),
+      Event(Instant.ofEpochMilli(160L), "A"),
+      Event(Instant.ofEpochMilli(160L), "A"),
+      Event(Instant.ofEpochMilli(180L), "A"),
+      Event(Instant.ofEpochMilli(200L), "A"),
+      Event(Instant.ofEpochMilli(200L), "B"),
+      Event(Instant.ofEpochMilli(210L), "A"),
+      Event(Instant.ofEpochMilli(220L), "A"),
+      Event(Instant.ofEpochMilli(240L), "B"),
+      Event(Instant.ofEpochMilli(280L), "A"),
+      Event(Instant.ofEpochMilli(240L), "A"),
+      Event(Instant.ofEpochMilli(260L), "A"),
+      Event(Instant.ofEpochMilli(280L), "A"),
+      Event(Instant.ofEpochMilli(290L), "B"),
+      Event(Instant.ofEpochMilli(300L), "A")
+    )
 
-  val window2: Stream[Seq[Event]] =
-    events.slidingWindow(latest)((latest, event) =>
-      (latest - event.timestamp) < 5.minutes)
+  val source = Stream.fromSeq(events)
 
-  (window1 zip window2).foldLeft(???)((accum, windows) => ???)
+  val windowSize = Duration.ofMillis(50L)
+  def withinWindow(duration: Duration): Boolean =
+    duration.compareTo(windowSize) <= 0
 
+  val windowed = source.slidingWindow(_.instant)(withinWindow)
 
-  def merge(left: Stream[A], right: Stream[B]): Stream[Either[A,B]] = ???
+  // Count occurrences and order from lowest to highest
+  val occurences = windowed.map{ window =>
+    val keys = window.map(event => event.key).distinct
+    val keysCount = keys.map(key => window.count(event => event.key == key))
 
-  def slidingWindow(events: Stream[Event], latest: Stream[Timestamp], width: Duration): Stream[Seq[Event]] = {
-    val joined: Stream[(Event, Timestamp)] = events.join(latest)
-    joined.scanLeft(Seq.empty){ (window, joined) =>
-      val (event: Event, ts: Timestamp) = joined
-      // Todo: remove duplicates
-      (event +: joined).filter(event => (ts - event.timestamp) < width)
-    }
-
+    (keys.zip(keysCount)).sortBy{ case (key, count) => count }
   }
 }
- */
