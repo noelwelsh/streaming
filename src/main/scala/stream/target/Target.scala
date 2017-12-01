@@ -11,7 +11,9 @@ object Target {
     stream match {
       case Stream.Map(source, f) => Map(fromStream(source), f)
       case Stream.Zip(left, right) => Zip(fromStream(left), fromStream(right))
+      case Stream.Merge(left, right) => Merge(fromStream(left), fromStream(right))
       case Stream.Filter(source, predicate) => Filter(fromStream(source), predicate)
+      case Stream.ScanLeft(source, z, f) => ScanLeft(fromStream(source), z, f)
       case Stream.FromIterator(source) => FromIterator(source)
       case Stream.FromSeq(source) => FromSeq(source)
     }
@@ -108,6 +110,82 @@ object Target {
         step()
       }
     }
+  }
+
+  final case class Merge[A,B](left: Target[A], right: Target[B]) extends Target[Either[A,B]] {
+
+    private var completed: Boolean = false
+    private var leftFirst: Boolean = true
+
+    private var lastLeft: Result[A] = _
+    private var lastRight: Result[B] = _
+
+    private def step(): Result[Either[A,B]] = {
+      if(leftFirst) {
+        leftFirst = false
+        lastLeft = left.next()
+
+        lastLeft match {
+          case Emit(v) => Result.emit(Left(v))
+          case Await =>
+            lastRight = right.next()
+
+            lastRight match {
+              case Emit(v) => Result.emit(Right(v))
+              case Await => Result.await
+              case Completed =>
+                completed = true
+                Result.completed
+            }
+          case Completed =>
+            completed = true
+            Result.completed
+        }
+      } else {
+        leftFirst = true
+        lastRight = right.next()
+
+        lastRight match {
+          case Emit(v) => Result.emit(Right(v))
+          case Await =>
+            lastLeft = left.next()
+
+            lastLeft match {
+              case Emit(v) => Result.emit(Left(v))
+              case Await => Result.await
+              case Completed =>
+                completed = true
+                Result.completed
+            }
+          case Completed =>
+            completed = true
+            Result.completed
+        }
+      }
+    }
+
+    def next(): Result[Either[A,B]] = {
+      if(completed) {
+        Result.completed
+      } else {
+        step()
+      }
+    }
+  }
+  final case class ScanLeft[A,B](source: Target[A], zero: B, f: (B, A) => B) extends Target[B] {
+    private var uninitialized: Boolean = true
+    private var intermediate: B = zero
+
+    def next(): Result[B] =
+      if(uninitialized) {
+        uninitialized = false
+        Result.emit(intermediate)
+      } else {
+        source.next().map{ a =>
+          intermediate = f(intermediate, a)
+          intermediate
+        }
+      }
   }
 
   final case class FromIterator[A](source: Iterator[A]) extends Target[A] {

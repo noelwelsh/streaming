@@ -9,8 +9,14 @@ sealed trait Stream[A] {
   def zip[B](that: Stream[B]): Stream[(A,B)] =
     Zip(this, that)
 
+  def merge[B](that: Stream[B]): Stream[Either[A,B]] =
+    Merge(this, that)
+
   def filter(predicate: A => Boolean): Stream[A] =
     Filter(this, predicate)
+
+  def scanLeft[B](z: B)(f: (B, A) => B): Stream[B] =
+    ScanLeft(this, z, f)
 
   /** The interpreter, executes a stream. */
   def foldLeft[B](z: B)(combine: (B, A) => B): B = {
@@ -36,7 +42,9 @@ sealed trait Stream[A] {
 object Stream {
   final case class Map[A,B](source: Stream[A], f: A => B) extends Stream[B]
   final case class Zip[A,B](left: Stream[A], right: Stream[B]) extends Stream[(A,B)]
+  final case class Merge[A,B](left: Stream[A], right: Stream[B]) extends Stream[Either[A,B]]
   final case class Filter[A](source: Stream[A], predicate: A => Boolean) extends Stream[A]
+  final case class ScanLeft[A,B](source: Stream[A], zero: B, f: (B,A) => B) extends Stream[B]
   final case class FromIterator[A](source: Iterator[A]) extends Stream[A]
   final case class FromSeq[A](source: Seq[A]) extends Stream[A]
 

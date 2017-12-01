@@ -29,4 +29,24 @@ class StreamSpec extends FunSuite with GeneratorDrivenPropertyChecks with Matche
       s1.zip(s2).toList should ===(s1.toList zip s2.toList)
     }
   }
+
+  test("scanLeft of stream has same results as scanLeft of stream result") {
+    forAll(iotaStreamGen){ s =>
+      s.scanLeft(0)(_ + _).toList should ===(s.toList.scanLeft(0)(_ + _))
+    }
+  }
+
+  test("merge fairly interleaves data was both streams have data") {
+    forAll(iotaStreamGen, iotaStreamGen){ (s1, s2) =>
+      val result = s1.merge(s2).toList
+      if(result.size > 0) {
+        result.tail.foldLeft(result.head){ (last, now) =>
+          if(last.isLeft) now.isRight should ===(true)
+          else now.isLeft should ===(true)
+
+          now
+        }
+      }
+    }
+  }
 }
